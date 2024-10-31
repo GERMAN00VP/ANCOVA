@@ -27,4 +27,4 @@ results, anova_results = do_ancova(data=df, interactions="ALL", plot=True, save_
 
 ## AN EXAMPLE OF THE RESULTING PLOT
 
-![Example Plot]("./Images/plot_exaple.png")
+![Example Plot](./Images/plot_exaple.png)
