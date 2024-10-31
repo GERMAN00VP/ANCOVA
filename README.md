@@ -1,4 +1,5 @@
 # ANCOVA Analysis Package
+
 ### By Germán Vallejo Palma
 
 This Python package provides an intuitive framework for performing parametric and non-parametric ANCOVA (Analysis of Covariance) with the ability to handle multiple levels of categorical variables and covariate interactions. Designed for flexibility, it allows users to assess the influence of both continuous and categorical predictors on a response variable, taking into account normality and homoscedasticity.
@@ -22,3 +23,7 @@ No external installation required. Make sure to have dependencies: `numpy`, `pan
 ```python
 # Example usage
 results, anova_results = do_ancova(data=df, interactions="ALL", plot=True, save_plot="ancova_plot.png")
+
+## AN EXAMPLE OF THE RESULTING PLOT
+
+![Example Plot]("./Images/plot_exaple.png")
