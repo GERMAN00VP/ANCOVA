@@ -23,6 +23,7 @@ No external installation required. Make sure to have dependencies: `numpy`, `pan
 ```python
 # Example usage
 results, anova_results = do_ancova(data=df, interactions="ALL", plot=True, save_plot="ancova_plot.png")
+```
 
 ## AN EXAMPLE OF THE RESULTING PLOT
 
