@@ -15,6 +15,7 @@ import seaborn as sns
 from statsmodels.stats.anova import anova_lm
 import matplotlib.pyplot as plt
 import seaborn as sns
+import itertools
 import scikit_posthocs as sp
 
 
@@ -78,16 +79,39 @@ def generar_diccionario_colores(valores):
 
 def interactions_translator(interactions,original_columns,translated_columns):
     columns_dict=dict(zip(original_columns,translated_columns))
-    new_interactions =  [(columns_dict[term] for term in interaction )for interaction in interactions]
+    new_interactions = []
+    for interaction in interactions:
+        new_tup = []
+        for val in interaction:
+            if val!=original_columns[1]:
+                new_tup.append(columns_dict[val])
+            else:
+                new_tup.append(f"C({columns_dict[val]})")
+        new_tup = tuple(new_tup)
+        new_interactions.append(new_tup)
+
     return new_interactions
 
 
 
 def convert_dun(dunn_results):
-    group1=dunn_results.columns[0],dunn_results.columns[0],dunn_results.columns[1]
-    group2=dunn_results.columns[1],dunn_results.columns[2],dunn_results.columns[2]
-    padj = dunn_results.iloc[0,1],dunn_results.iloc[0,2],dunn_results.iloc[1,2]
-    return pd.DataFrame([group1,group2,padj],index=["group1",'group2',"p-adj"]).T
+    # Inicializamos listas para almacenar los resultados
+    group1 = []
+    group2 = []
+    padj = []
+
+    # Iteramos sobre todas las combinaciones posibles de índices de columnas
+    for i, j in itertools.combinations(range(len(dunn_results.columns)), 2):
+        group1.append(dunn_results.columns[i])
+        group2.append(dunn_results.columns[j])
+        padj.append(dunn_results.iloc[i, j])
+
+    # Convertimos los resultados a un DataFrame
+    return pd.DataFrame({
+        "group1": group1,
+        "group2": group2,
+        "p-adj": padj
+    })
 
 
 
@@ -147,13 +171,24 @@ def add_significance(ax, y_base, height, posthoc, order, fixed_vertical_height=0
                     ha='center', va='bottom', color='black', fontsize=13, fontweight=900)
 
 
-def eliminate_cat_variable(formula):
+def eliminate_cat_variable(formula,sum_of_squares_type):
 
-    terms= formula.split("~")
+    if sum_of_squares_type==2:
+        # Eliminate the effect of the interaction in the covariate correction formula
+        terms= formula.split("~")
+        cat_var = terms[1].split("+")[0][3:-2]
+        new_term=[]
+        for subterm in terms[1].split("+")[1:]:
+            if cat_var not in subterm:
+                new_term.append(subterm)
 
-    terms[1] = "+".join(terms[1].split("+")[1:])
+        terms[1] = "+".join(new_term)
+        new_formula = "~".join(terms)
 
-    new_formula = "~".join(terms)
+    else:
+        terms= formula.split("~")
+        terms[1] = "+".join(terms[1].split("+")[1:])
+        new_formula = "~".join(terms)
 
     return new_formula
 
@@ -162,7 +197,7 @@ def eliminate_cat_variable(formula):
 
 def do_ancova(data:pd.DataFrame,interactions:list|str=None,
               plot:bool=False, save_plot:bool|str=False,covariate_to_plot:str=None,palette:dict=None,
-              y_lab=False,x_lab=False ):
+              y_lab=False,x_lab=False, sum_of_squares_type=2):
     
     """ Function that allows you to make parametrical or non-parametrical ancovas.
 
@@ -220,6 +255,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
     #For the analysis
     formula = generate_formula(data.columns[0],data.columns[1],data.columns[2:].tolist(), interactions=new_interactions)
 
+
     # Ajuste de modelo lineal con ambos factores
     model = ols(formula, data=data).fit()
 
@@ -235,8 +271,13 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
     elif len(residual_groups)==3:
         # Prueba de Levene sobre los residuos (agrupados por categoria)
         levene_test = levene(residual_groups[0],residual_groups[1],residual_groups[2])
-    elif len(residual_groups)>3:
-        print("Not implemented levene test for more than 3 groups")
+    elif len(residual_groups)==4:
+        # Prueba de Levene sobre los residuos (agrupados por categoria)
+        levene_test = levene(residual_groups[0],residual_groups[1],residual_groups[2],residual_groups[3])
+    
+    else:
+        print("Not implemented yet.")
+
 
 
     shapiro_test = shapiro(residuals).pvalue>0.05
@@ -245,17 +286,17 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
     if shapiro_test and levene_test:
         # Fit normal anova to the model
-        anova_results = anova_lm(model, typ=2)
+        anova_results = anova_lm(model, typ=sum_of_squares_type)
+
+        # Adjust the model for the covariables
+        model_covariables = ols(eliminate_cat_variable(formula, sum_of_squares_type=sum_of_squares_type), data=data).fit()
+            
+        # Extract the data adjusted for the covariables
+        data["Adj_data"]= model_covariables.predict().mean()+model_covariables.resid
         
 
-        if anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]<0.05 and len(residual_groups)==3:
+        if anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]<0.05 and len(residual_groups)>2:
 
-            # Adjust the model for the covariables
-            model_covariables = ols(eliminate_cat_variable(formula), data=data).fit()
-            
-            # Extract the data adjusted for the covariables
-            data["Adj_data"]= model_covariables.predict().mean()+model_covariables.resid
-            
             # Post-hoc test Tukey
             ph =  pd.DataFrame(sm.stats.multicomp.pairwise_tukeyhsd(endog=data["Adj_data"], 
                                                                        groups=data[data.columns[1]], alpha=0.05).summary().data)
@@ -268,44 +309,46 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         # Convert the response to ranked response
         data[data.columns[0]] = data[data.columns[0]].rank()
         model = ols(formula, data=data).fit()
-        anova_results = anova_lm(model, typ=2)
+        anova_results = anova_lm(model, typ=sum_of_squares_type)
+        # Adjust the model for the covariables
+        model_covariables = ols(eliminate_cat_variable(formula,sum_of_squares_type=sum_of_squares_type), data=data).fit()
+        # Extract the data adjusted for the covariables
+        adjusted = model_covariables.predict().mean()+model_covariables.resid
+        data["Adj_data"] = adjusted
 
-        if anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]<0.05 and len(residual_groups)==3:
-
-            # Adjust the model for the covariables
-            model_covariables = ols(eliminate_cat_variable(formula), data=data).fit()
-            # Extract the data adjusted for the covariables
-            adjusted = model_covariables.predict().mean()+model_covariables.resid
+        if anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]<0.05  and len(residual_groups)>2:
             predicted_groups = [adjusted[data[data.columns[1]]==level] for level in data[data.columns[1]].unique()]
             # Post-hoc test Dunn test on the residuals
             dunn_results = sp.posthoc_dunn(predicted_groups, p_adjust='holm')
             dunn_results.columns=data[data.columns[1]].unique()
             dunn_results.index=data[data.columns[1]].unique()
             ph = convert_dun(dunn_results)
+    
 
 
 
-
-    results_dict = {"Target":target, "Categorical condition":categorical_var, "Co-variables":covars, "Res-Normality":shapiro_test,
+    results_dict = {"Target":target, "Categorical condition":data.columns[1], "Co-variables":covars, "Res-Normality":shapiro_test,
                     "Res-Homoscedasticity":levene_test,"Formula":pretty_formula, "N":N,
-                    "P.val (Categorical condition)":round(anova_results.loc[f"C({categorical_var})"]["PR(>F)"],4),
-                    "P.val (Co-variable)":round(anova_results.loc[f"{data.columns[2]}"]["PR(>F)"],4)}
+                    "P.val (Categorical condition)":round(anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"],4)}
 
 
 #########################
 ## PLOT
 #########################
+
+    # Adjust the data before ploting
+    data_pl["Adj_data"]= data["Adj_data"]
+    # Define the optional values if not provided
+    if palette is None:
+        palette = generar_diccionario_colores(data[data.columns[1]].unique().tolist())
+                                                
+    if covariate_to_plot is None:
+        covariate_to_plot=data.columns[2]
+
     
+
     if plot:    
         
-        # Define the optional values if not provided
-        if palette is None:
-            palette = generar_diccionario_colores(data[data.columns[1]].unique().tolist())
-                                                    
-        if covariate_to_plot is None:
-            covariate_to_plot=data.columns[2]
-
-
         # Crear subplots
         fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
@@ -322,9 +365,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         else:
             pval_covariable = round(pval_covariable,3)
 
-
         plot_int_sig = False
-
         
         covariate_in_interaction =  data_pl.columns[2]         
 
@@ -332,14 +373,13 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         if interactions is None:
             None  
 
-
         elif  (categorical_var,covariate_in_interaction) in interactions:
-            pval_interaction = anova_results.loc[f"{categorical_var}:{covariate_to_plot}"]["PR(>F)"]
+            pval_interaction = anova_results.loc[f"C({data.columns[1]}):{covariate_to_plot}"]["PR(>F)"]
             plot_int_sig = True
 
         elif  (covariate_in_interaction,categorical_var) in interactions:
 
-            pval_interaction = anova_results.loc[f"{covariate_to_plot}:{categorical_var}"]["PR(>F)"]
+            pval_interaction = anova_results.loc[f"{covariate_to_plot}:C({data.columns[1]})"]["PR(>F)"]
             plot_int_sig = True
 
         if plot_int_sig:
@@ -361,7 +401,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
         ### The cathegorical plot
 
-        sns.boxplot(data=data_pl,y=target,x=categorical_var,
+        sns.boxplot(data=data_pl,y="Adj_data",x=categorical_var,
                     palette=palette,ax=axs[1])
 
         # If the post hoc was performed, add the brackets and asterisks
@@ -372,7 +412,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
                             order=data[data.columns[1]].unique(), fixed_vertical_height=ylim[1]/50)
                 
 
-        pval_categorical = anova_results.loc[f"C({categorical_var})"]["PR(>F)"]
+        pval_categorical = anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]
 
         if pval_categorical<0.001:
             pval_categorical = "<0.001"
@@ -386,7 +426,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         # Set the axis labels if provided:
         if y_lab:
             axs[0].set_ylabel(y_lab)
-            axs[1].set_ylabel(y_lab)
+            axs[1].set_ylabel("Adjusted " + y_lab)
         if x_lab:
             axs[0].set_xlabel(x_lab)
             axs[1].set_xlabel("")
@@ -400,4 +440,5 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         plt.show()
 
         
-    return pd.DataFrame(results_dict),anova_results
+    return pd.DataFrame(results_dict),anova_results, ph 
+
