@@ -193,10 +193,38 @@ def eliminate_cat_variable(formula,sum_of_squares_type):
     return new_formula
 
 
+def plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph,ax, y_lab=False):
+
+    sns.boxplot(data=data_pl,y="Adj_data",x=categorical_var,
+            palette=palette,ax=ax)
+
+    # If the post hoc was performed, add the brackets and asterisks
+    if not ph is None:
+        ylim = ax.get_ylim()
+        # Agregar los corchetes de significancia
+        add_significance(ax, y_base=ylim[1], height=ylim[1]/18,posthoc=ph, 
+                        order=data_pl[data_pl.columns[1]].unique(), fixed_vertical_height=ylim[1]/50)
+
+
+    if pval_categorical<0.001:
+        pval_categorical = "<0.001"
+    else:
+        pval_categorical = round(pval_categorical,3)
+
+    # ADD SIGNIFICANCE AS TITLE
+    ax.set_title(f"P-value: {pval_categorical}")
+
+    # Set the axis labels if provided:
+    if y_lab:
+        ax.set_ylabel("Adj. " + y_lab)
+    
+    ax.set_xlabel("")
+
+    return ax
 
 
 def do_ancova(data:pd.DataFrame,interactions:list|str=None,
-              plot:bool=False, save_plot:bool|str=False,covariate_to_plot:str=None,palette:dict=None,
+              plot:bool=False,ax=None, save_plot:bool|str=False,covariate_to_plot:str=None,palette:dict=None,
               y_lab=False,x_lab=False, sum_of_squares_type=2):
     
     """ Function that allows you to make parametrical or non-parametrical ancovas.
@@ -347,90 +375,81 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
     
 
-    if plot:    
-        
-        # Crear subplots
-        fig, axs = plt.subplots(1, 2, figsize=(12, 5))
+    if plot:
 
-        # Añadir líneas de regresión para cada grupo en hue
-        for group in data_pl[categorical_var].unique():
-            subset = data_pl[data_pl[categorical_var] == group]
-            sns.regplot(data=subset, x=covars[0], y=target, ax=axs[0], scatter=True, label=f'{group}',color=palette[group])
-
+        # EXTRACT THE CATEGORICAL PVAL
+        pval_categorical = anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]
         # EXTRACT THE COVARIABLE PVAL
         pval_covariable = anova_results.loc[f"{covariate_to_plot}"]["PR(>F)"]
 
-        if pval_covariable<0.001:
-            pval_covariable = "<0.001"
-        else:
-            pval_covariable = round(pval_covariable,3)
 
-        plot_int_sig = False
+        if ax is None:    
         
-        covariate_in_interaction =  data_pl.columns[2]         
+            # Crear subplots
+            fig, axs = plt.subplots(1, 2, figsize=(12, 5))
 
-        # Interaction, pval:
-        if interactions is None:
-            None  
+            # Añadir líneas de regresión para cada grupo en hue
+            for group in data_pl[categorical_var].unique():
+                subset = data_pl[data_pl[categorical_var] == group]
+                sns.regplot(data=subset, x=covars[0], y=target, ax=axs[0], scatter=True, label=f'{group}',color=palette[group])
 
-        elif  (categorical_var,covariate_in_interaction) in interactions:
-            pval_interaction = anova_results.loc[f"C({data.columns[1]}):{covariate_to_plot}"]["PR(>F)"]
-            plot_int_sig = True
+            # EXTRACT THE COVARIABLE PVAL
 
-        elif  (covariate_in_interaction,categorical_var) in interactions:
-
-            pval_interaction = anova_results.loc[f"{covariate_to_plot}:C({data.columns[1]})"]["PR(>F)"]
-            plot_int_sig = True
-
-        if plot_int_sig:
-
-            if pval_interaction<0.001:
-                pval_interaction = "<0.001"
+            if pval_covariable<0.001:
+                pval_covariable = "<0.001"
             else:
-                pval_interaction = round(pval_interaction,3)
+                pval_covariable = round(pval_covariable,3)
 
-            # ADD SIGNIFICANCE AS TITLE with interaction
-            axs[0].set_title(f"P-value: {pval_covariable}| Interaction P-value: {pval_interaction}")
-
-        else: 
-            # ADD SIGNIFICANCE AS TITLE
-            axs[0].set_title(f"P-value: {pval_covariable}")
+            plot_int_sig = False
             
+            covariate_in_interaction =  data_pl.columns[2]         
 
-        axs[0].legend()
+            # Interaction, pval:
+            if interactions is None:
+                None  
 
-        ### The cathegorical plot
+            elif  (categorical_var,covariate_in_interaction) in interactions:
+                pval_interaction = anova_results.loc[f"C({data.columns[1]}):{covariate_to_plot}"]["PR(>F)"]
+                plot_int_sig = True
 
-        sns.boxplot(data=data_pl,y="Adj_data",x=categorical_var,
-                    palette=palette,ax=axs[1])
+            elif  (covariate_in_interaction,categorical_var) in interactions:
 
-        # If the post hoc was performed, add the brackets and asterisks
-        if not ph is None:
-            ylim = axs[1].get_ylim()
-            # Agregar los corchetes de significancia
-            add_significance(axs[1], y_base=ylim[1], height=ylim[1]/18,posthoc=ph, 
-                            order=data[data.columns[1]].unique(), fixed_vertical_height=ylim[1]/50)
+                pval_interaction = anova_results.loc[f"{covariate_to_plot}:C({data.columns[1]})"]["PR(>F)"]
+                plot_int_sig = True
+
+            if plot_int_sig:
+
+                if pval_interaction<0.001:
+                    pval_interaction = "<0.001"
+                else:
+                    pval_interaction = round(pval_interaction,3)
+
+                # ADD SIGNIFICANCE AS TITLE with interaction
+                axs[0].set_title(f"P-value: {pval_covariable}| Interaction P-value: {pval_interaction}")
+
+            else: 
+                # ADD SIGNIFICANCE AS TITLE
+                axs[0].set_title(f"P-value: {pval_covariable}")
                 
 
-        pval_categorical = anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]
+            axs[0].legend()
+            
+            # Set the axis labels if provided:
+            if y_lab:
+                axs[0].set_ylabel(y_lab)
+            if x_lab:
+                axs[0].set_xlabel(x_lab)
 
-        if pval_categorical<0.001:
-            pval_categorical = "<0.001"
+            ### The cathegorical plot
+
+            plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph=ph,ax=axs[1],y_lab=y_lab)
+
+
         else:
-            pval_categorical = round(pval_categorical,3)
 
-        # ADD SIGNIFICANCE AS TITLE
-        axs[1].set_title(f"P-value: {pval_categorical}")
+            plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph=ph,ax=ax,y_lab=y_lab)
 
-
-        # Set the axis labels if provided:
-        if y_lab:
-            axs[0].set_ylabel(y_lab)
-            axs[1].set_ylabel("Adjusted " + y_lab)
-        if x_lab:
-            axs[0].set_xlabel(x_lab)
-            axs[1].set_xlabel("")
-        
+            return pd.DataFrame(results_dict),anova_results, ph ,ax
 
         # Guardar la figura
         if save_plot:
@@ -441,4 +460,3 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
         
     return pd.DataFrame(results_dict),anova_results, ph 
-
