@@ -206,6 +206,9 @@ def plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph,ax, y_lab=F
 
     sns.boxplot(data=data_pl,y="Adj_data",x=categorical_var,
             palette=palette,ax=ax)
+    # Añadir los puntos en color negro con alpha de 0.5
+    sns.stripplot(data=data_pl, y="Adj_data", x=categorical_var, 
+              color="black", alpha=0.5, jitter=True, ax=ax)
 
     # If the post hoc was performed, add the brackets and asterisks
     if not ph is None:
