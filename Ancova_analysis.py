@@ -205,7 +205,7 @@ def eliminate_cat_variable(formula,sum_of_squares_type):
 def plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph,ax, y_lab=False):
 
     sns.boxplot(data=data_pl,y="Adj_data",x=categorical_var,
-            palette=palette,ax=ax)
+            palette=palette,ax=ax,fliersize=0)
     # Añadir los puntos en color negro con alpha de 0.5
     sns.stripplot(data=data_pl, y="Adj_data", x=categorical_var, 
               color="black", alpha=0.5, jitter=True, ax=ax)
