@@ -25,13 +25,23 @@ import scikit_posthocs as sp
 def generate_formula(target,categorical_var,covars, interactions=None):
 
     covars_str = " + ".join(covars)
+    # Convertir str en list
+    if type(categorical_var)==str:
+        categorical_var = [categorical_var]
 
-    formula = f"{target} ~ C({categorical_var}) + {covars_str}"
+    # Añadir el c() a cada elemento de la lists de variables categoricas
+    categorical_list = [f"C({var})" for var in categorical_var]
+    # Generar la str categórica para la fórmula
+    cat_str = " + ".join(categorical_list)
+
+    # Unir los elementos de la fórmula
+    formula = f"{target} ~ {cat_str} + {covars_str}"
+     
 
     if not interactions is None:
 
         if interactions=="ALL":
-            interactions = " + ".join(["*".join(list(interaction)) for interaction in obtener_combinaciones([categorical_var]+covars)])
+            interactions = " + ".join(["*".join(list(interaction)) for interaction in obtener_combinaciones(categorical_list+covars)])
     
         elif type(interactions)==list:
             interactions = " + ".join(["*".join(list(interaction)) for interaction in interactions])
@@ -192,7 +202,6 @@ def eliminate_cat_variable(formula,sum_of_squares_type):
 
     return new_formula
 
-
 def plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph,ax, y_lab=False):
 
     sns.boxplot(data=data_pl,y="Adj_data",x=categorical_var,
@@ -223,9 +232,10 @@ def plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph,ax, y_lab=F
     return ax
 
 
+
 def do_ancova(data:pd.DataFrame,interactions:list|str=None,
-              plot:bool=False,ax=None, save_plot:bool|str=False,covariate_to_plot:str=None,palette:dict=None,
-              y_lab=False,x_lab=False, sum_of_squares_type=2):
+              plot:bool=False, save_plot:bool|str=False,covariate_to_plot:str=None,palette:dict=None,
+              y_lab=False,x_lab=False, sum_of_squares_type=2,categories:int=1,ax=None):
     
     """ Function that allows you to make parametrical or non-parametrical ancovas.
 
@@ -249,6 +259,8 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         -palette(dict): Optional. A dictionary with:
                 -> keys= leves of cathegorical independent variable
                 -> values= colors
+
+        -categories(int): if there is more than 1 category indicate the number, the fist on the df.columns will be the main (for plotting and post-hoc tests)
         
 
     Returns:
@@ -261,13 +273,22 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
     # Extract the variable names from the df
     target = data_pl.columns[0]
-    categorical_var = data_pl.columns[1]
-    covars = data_pl.columns[2:].tolist()
+    categorical_var = data_pl.columns[1] # The main condition to compare
+    covars = data_pl.columns[1+categories:].tolist() # The first will be the 
+    categorical_list = data_pl.columns[1:1+categories].tolist()
+    
 
 
     # Format the data for statmodels error handling
     data = remove_unwanted_chars(data).dropna()
+    # Extract the variable names from the df
+    target_translated = data.columns[0]
+    categorical_var_translated = data.columns[1] # The main condition to compare
+    categorical_list_translated = data.columns[1:1+categories].tolist()
+    covars_translated = data.columns[1+categories:].tolist() # The first will be the 
 
+
+    
     N = data.shape[0]
 
     # Format the interactions statmodels error handling
@@ -278,10 +299,10 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         
 
     # For the report
-    pretty_formula = generate_formula(target,categorical_var,covars, interactions=interactions)
+    pretty_formula = generate_formula(target,categorical_list,covars, interactions=interactions)
 
     #For the analysis
-    formula = generate_formula(data.columns[0],data.columns[1],data.columns[2:].tolist(), interactions=new_interactions)
+    formula = generate_formula(data.columns[0],categorical_list_translated,covars_translated, interactions=new_interactions)
 
 
     # Ajuste de modelo lineal con ambos factores
@@ -291,7 +312,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
     residuals = model.resid
 
     # Extrae las agrupaciones de los residuos
-    residual_groups = [residuals[data[data.columns[1]]==level] for level in data[data.columns[1]].unique()]
+    residual_groups = [residuals[data[categorical_var_translated]==level] for level in data[categorical_var_translated].unique()]
 
     if len(residual_groups)==2:
         # Prueba de Levene sobre los residuos (agrupados por categoria)
@@ -305,7 +326,6 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
     
     else:
         print("Not implemented yet.")
-
 
 
     shapiro_test = shapiro(residuals).pvalue>0.05
@@ -355,9 +375,9 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
 
 
-    results_dict = {"Target":target, "Categorical condition":data.columns[1], "Co-variables":covars, "Res-Normality":shapiro_test,
+    results_dict = {"Target":target, "Categorical conditions":";".join(categorical_list), "Co-variables":";".join(covars), "Res-Normality":shapiro_test,
                     "Res-Homoscedasticity":levene_test,"Formula":pretty_formula, "N":N,
-                    "P.val (Categorical condition)":round(anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"],4)}
+                    "P.val (Categorical condition)":round(anova_results.loc[f"C({categorical_var_translated})"]["PR(>F)"],4)}
 
 
 #########################
@@ -368,20 +388,17 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
     data_pl["Adj_data"]= data["Adj_data"]
     # Define the optional values if not provided
     if palette is None:
-        palette = generar_diccionario_colores(data[data.columns[1]].unique().tolist())
+        palette = generar_diccionario_colores(data[categorical_var_translated].unique().tolist())
                                                 
     if covariate_to_plot is None:
-        covariate_to_plot=data.columns[2]
+        covariate_to_plot=covars_translated[0]
 
-    
-
-    if plot:
+    if plot:  
 
         # EXTRACT THE CATEGORICAL PVAL
-        pval_categorical = anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]
+        pval_categorical = anova_results.loc[f"C({categorical_var_translated})"]["PR(>F)"]
         # EXTRACT THE COVARIABLE PVAL
         pval_covariable = anova_results.loc[f"{covariate_to_plot}"]["PR(>F)"]
-
 
         if ax is None:    
         
@@ -390,8 +407,13 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
             # Añadir líneas de regresión para cada grupo en hue
             for group in data_pl[categorical_var].unique():
-                subset = data_pl[data_pl[categorical_var] == group]
-                sns.regplot(data=subset, x=covars[0], y=target, ax=axs[0], scatter=True, label=f'{group}',color=palette[group])
+                try:
+                    subset = data_pl[data_pl[categorical_var] == group]
+                    sns.regplot(data=subset, x=covars[0], y=target, ax=axs[0], scatter=True, label=f'{group}',color=palette[group])
+
+                except:
+                    print("Set the real number of categorical covariables.")
+                    raise 
 
             # EXTRACT THE COVARIABLE PVAL
 
@@ -444,12 +466,11 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
             plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph=ph,ax=axs[1],y_lab=y_lab)
 
-
         else:
 
             plot_boxplot(data_pl,categorical_var,palette,pval_categorical,ph=ph,ax=ax,y_lab=y_lab)
 
-            return pd.DataFrame(results_dict),anova_results, ph ,ax
+            return pd.DataFrame([results_dict]),anova_results, ph ,ax
 
         # Guardar la figura
         if save_plot:
@@ -459,4 +480,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         plt.show()
 
         
-    return pd.DataFrame(results_dict),anova_results, ph 
+    return pd.DataFrame([results_dict]),anova_results, ph 
+
+
+
