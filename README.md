@@ -140,8 +140,6 @@ from Ancova_analysis import do_ancova
 
 The Number of T Cells decreases with age, and the reduction is more significant for individuals with HIV+ (Untreated).
 
-**Lets see if the package is able to capture this differences:**
-
 
 ```python
 # Set the seed for reproducibility
@@ -188,6 +186,7 @@ data_hiv = pd.DataFrame({
 data_hiv.head()
 
 ```
+**Lets see if the ANCOVA analysis is able to capture this differences:**
 
 ```python 
 
