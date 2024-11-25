@@ -87,6 +87,27 @@ The main purpose of the `do_ancova` function is to perform **parametric** or **n
    Saves plots to the specified file path if `save_plot` is provided.
 
 
+## Installation
+
+The package can be installed via:
+
+### GitHub
+Clone the repository and install it manually:
+
+```bash
+git clone https://github.com/GERMAN00VP/ANCOVA
+cd ./ANCOVA
+pip install .
+```
+
+### pip
+
+Install it directly from PyPI:
+
+```bash
+pip install ANCOVA
+```
+
 ### Dependencies
 
 The script relies on the following Python packages:
