@@ -75,8 +75,8 @@ The main purpose of the `do_ancova` function is to perform **parametric** or **n
   ### Output:
 
 1. **Results**:  
-   - A summary dictionary with the ANCOVA parameters and outcomes.  
-   - An ANOVA table with p-values for each effect.  
+   - A summary data frame with the ANCOVA parameters and outcomes.  
+   - An ANCOVA table with p-values for each effect.  
    - Post-hoc results (if applicable).
 
 2. **Plots**:  
