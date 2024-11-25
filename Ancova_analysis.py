@@ -17,6 +17,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import itertools
 import scikit_posthocs as sp
+import statsmodels.stats.multicomp as mc
 
 
 
@@ -240,34 +241,81 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
               plot:bool=False, save_plot:bool|str=False,covariate_to_plot:str=None,palette:dict=None,
               y_lab=False,x_lab=False, sum_of_squares_type=2,categories:int=1,ax=None):
     
-    """ Function that allows you to make parametrical or non-parametrical ancovas.
+    """
+    Perform parametric or non-parametric ANCOVA (Analysis of Covariance) with support for visualization and post-hoc analysis.
 
     Parameters:
-
-        - data: pd.Dataframe. It contains the info for the ancova in the following order:
-            -> Column_1: The response variable, the target.
-            -> Column_2: The cathegorical independent variable of your study (now allows up to 3 levels).
-            -> Column_3 to end: The rest of the continous variables.       
-
-        - interactions(list|str): defaults to None.
-            -> If "ALL": computes all interactions.
-            -> If list: expects a list of tuples (one for each interaction) with the interacting variables (columns) names.
-        
-        - plot(bool):if True performs a lm_plot data_pl with a boxplot. Defaults to False.
-
-        - save_plot(bool|str): Defaults to false. If a path (str) is given, saves the plot there.
-
-        - covariate_to_plot(str): the continuos covariate that is plotted.
-
-        -palette(dict): Optional. A dictionary with:
-                -> keys= leves of cathegorical independent variable
-                -> values= colors
-
-        -categories(int): if there is more than 1 category indicate the number, the fist on the df.columns will be the main (for plotting and post-hoc tests)
-        
+    ----------
+    data : pd.DataFrame
+        DataFrame containing the variables for ANCOVA analysis.
+        - Column 0: Response variable (dependent variable).
+        - Column 1 to n categories: Categorical independent variable(s) (first is the main grouping factor).
+        - Column n categories to end: Continuous covariates.
+    interactions : list or str, optional
+        Specifies interactions between variables:
+        - "ALL": Include all possible interactions.
+        - list: List of tuples specifying interactions by column names (e.g., [('Var1', 'Var2')]).
+        - None: Default. No interactions.
+    plot : bool, optional
+        If True, generates a regression scatterplot and a boxplot. Default is False.
+    save_plot : bool or str, optional
+        If a file path (str) is provided, saves the generated plot at the specified location. Default is False.
+    covariate_to_plot : str, optional
+        Specifies the continuous covariate to include in the plot. Default is the first covariate in the DataFrame.
+    palette : dict, optional
+        A dictionary mapping categorical variable levels to colors for the plot.
+    y_lab : str, optional
+        Label for the y-axis in the generated plot. Default is False (no label).
+    x_lab : str, optional
+        Label for the x-axis in the generated plot. Default is False (no label).
+    sum_of_squares_type : int, optional
+        Specifies the type of sums of squares for ANCOVA. Default is Type 2 (value = 2).
+    categories : int, optional
+        Number of categorical independent variables. Default is 1.
+    ax : Matplotlib axis, optional
+        Axis object for custom plotting. Default is None. Use this option to generate only the boxplot.
 
     Returns:
-        ancova_results: A dictionary with the main results and job parameters.
+    -------
+    tuple
+        - results_dict : pd.DataFrame
+          A DataFrame containing the main analysis results, including assumptions and p-values.
+        - anova_results : pd.DataFrame
+          ANOVA table summarizing effects and their significance levels.
+        - ph : pd.DataFrame or None
+          Post-hoc results table if applicable (Tukey or Dunn test), else None.
+        - ax : Matplotlib axis (if provided)
+
+    Notes:
+    ------
+    - Automatically checks assumptions of normality (Shapiro test) and homoscedasticity (Levene test).
+    - Performs parametric ANCOVA if assumptions are met; otherwise, a ranked (non-parametric) ANCOVA is performed.
+    - If significant differences between groups are detected, post-hoc tests (Tukey or Dunn) are applied.
+
+    Example:
+    --------
+    ```python
+    import pandas as pd
+
+    data = pd.DataFrame({
+        'Response': [5, 6, 7, 8, 7, 6, 5, 6],
+        'Group': ['A', 'A', 'B', 'B', 'A', 'B', 'A', 'B'],
+        'Covariate': [1, 2, 3, 4, 5, 6, 7, 8]
+    })
+
+    results, anova_table, posthoc = do_ancova(
+        data=data,
+        interactions="ALL",
+        plot=True,
+        save_plot="ancova_results.png",
+        covariate_to_plot="Covariate",
+        palette={"A": "blue", "B": "orange"},
+        y_lab="Response",
+        x_lab="Covariate",
+        categories=1
+    )
+    ```
+
     """
 
     
@@ -349,8 +397,8 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
         if anova_results.loc[f"C({data.columns[1]})"]["PR(>F)"]<0.05 and len(residual_groups)>2:
 
             # Post-hoc test Tukey
-            ph =  pd.DataFrame(sm.stats.multicomp.pairwise_tukeyhsd(endog=data["Adj_data"], 
-                                                                       groups=data[data.columns[1]], alpha=0.05).summary().data)
+            ph =  pd.DataFrame(mc.pairwise_tukeyhsd(endog=data["Adj_data"], 
+                                                                    groups=data[data.columns[1]], alpha=0.05).summary().data)
             ph.columns=ph.loc[0]
             ph.drop(0,inplace=True)
             
@@ -477,7 +525,7 @@ def do_ancova(data:pd.DataFrame,interactions:list|str=None,
 
         # Guardar la figura
         if save_plot:
-            plt.savefig(save_plot,bbox_to_inches="tight")
+            plt.savefig(save_plot,bbox_inches="tight")
 
         # Mostrar la figura
         plt.show()
