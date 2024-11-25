@@ -1,0 +1,10 @@
+README.md
+setup.cfg
+setup.py
+ANCOVA/Ancova_analysis.py
+ANCOVA/__init__.py
+ANCOVA.egg-info/PKG-INFO
+ANCOVA.egg-info/SOURCES.txt
+ANCOVA.egg-info/dependency_links.txt
+ANCOVA.egg-info/requires.txt
+ANCOVA.egg-info/top_level.txt

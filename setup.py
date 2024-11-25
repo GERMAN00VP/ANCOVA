@@ -2,7 +2,7 @@ from setuptools import setup, find_packages
 
 setup(
     name="ANCOVA",  # Nombre del paquete
-    version="0.1.0",  # Versión inicial
+    version="0.1.2",  # Versión 
     author="Germán Vallejo Palma",
     author_email="vallejopalma.g@gmail.com",
     description="Package for ANCOVA analysis and visualization.",
@@ -24,5 +24,5 @@ setup(
         "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
     ],
-    python_requires=">=3.6",  # Requiere Python 3.6 o superior
+    python_requires=">=3.10",  # Requiere Python 3.10 o superior
 )
