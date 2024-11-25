@@ -2,7 +2,7 @@
 
 ## Overview
 
-This script, created by **Germán Vallejo Palma**, provides tools for performing ANCOVA (Analysis of Covariance) and related statistical analyses. It includes a primary function, `do_ancova`, which integrates multiple steps of ANCOVA analysis and allows for flexible customization of inputs and outputs, including graphical representations of results.
+This script, provides tools for performing ANCOVA (Analysis of Covariance) and related statistical analyses. It includes a primary function, `do_ancova`, which integrates multiple steps of ANCOVA analysis and allows for flexible customization of inputs and outputs, including graphical representations of results.
 
 ---
 
