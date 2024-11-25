@@ -6,6 +6,50 @@ This script, provides tools for performing ANCOVA (Analysis of Covariance) and r
 
 ---
 
+## Installation
+
+The package can be installed via:
+
+### GitHub
+Clone the repository and install it manually:
+
+```bash
+git clone https://github.com/GERMAN00VP/ANCOVA
+cd ./ANCOVA
+pip install .
+```
+
+### pip
+
+Install it directly from PyPI:
+
+```bash
+pip install ANCOVA
+```
+
+### Requirements
+
+**python>=3.10**
+
+### Dependencies
+
+The script relies on the following Python packages:
+
+- `numpy`  
+- `pandas`  
+- `statsmodels`  
+- `scipy`  
+- `seaborn`  
+- `matplotlib`  
+- `scikit_posthocs`  
+
+Install these dependencies using:  
+
+```bash
+pip install numpy pandas statsmodels scipy seaborn matplotlib scikit-posthocs
+```
+---
+
 ## Key Functionality: `do_ancova`
 
 The main purpose of the `do_ancova` function is to perform **parametric** or **non-parametric ANCOVA** on a dataset. It accepts a DataFrame containing the dependent variable, categorical variables, and covariates to evaluate the relationship between them while adjusting for covariates.
@@ -86,45 +130,6 @@ The main purpose of the `do_ancova` function is to perform **parametric** or **n
 3. **Files (Optional)**:  
    Saves plots to the specified file path if `save_plot` is provided.
 
-
-## Installation
-
-The package can be installed via:
-
-### GitHub
-Clone the repository and install it manually:
-
-```bash
-git clone https://github.com/GERMAN00VP/ANCOVA
-cd ./ANCOVA
-pip install .
-```
-
-### pip
-
-Install it directly from PyPI:
-
-```bash
-pip install ANCOVA
-```
-
-### Dependencies
-
-The script relies on the following Python packages:
-
-- `numpy`  
-- `pandas`  
-- `statsmodels`  
-- `scipy`  
-- `seaborn`  
-- `matplotlib`  
-- `scikit_posthocs`  
-
-Install these dependencies using:  
-
-```bash
-pip install numpy pandas statsmodels scipy seaborn matplotlib scikit-posthocs
-```
 
 ### Notes
 
